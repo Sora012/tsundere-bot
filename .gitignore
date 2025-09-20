@@ -4,3 +4,4 @@ backend/*.db
 .DS_Store
 *.db
 *.sqlite
+.env
