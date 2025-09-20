@@ -39,5 +39,4 @@ node backend/server.js
 - Frontend-backend communication with Fetch API  
 - Portfolio publication on GitHub  
 
-🌸 [日本語README](README.md)
-
+🌸 [日本語README](README.md)　
