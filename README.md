@@ -35,3 +35,5 @@ node backend/server.js
 - SQLiteでの履歴保存と操作
 - フロントエンドとバックエンドの連携
 - GitHubでの公開・ポートフォリオ化
+
+🌐 [English README](README.en.md)
