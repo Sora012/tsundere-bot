@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Tsundere Bot</title>
+  <link rel="stylesheet" href="./frontend/styles.css" />
+</head>
+<body>
+  <header class="app-header">
+    <h1>Tsundere Bot</h1>
+    <div class="toolbar">
+      <span id="affBadge" class="aff-badge" aria-live="polite">❤ 0</span>
+      <button id="reloadBtn" title="履歴再読み込み">⟳</button>
+      <button id="sortBtn" title="並び替え">⇅</button>
+      <!-- アイコン差し替え（localStorage保存） -->
+      <button id="setUserIconBtn" class="icon-btn" title="あなたのアイコンを変更">👤</button>
+      <button id="setBotIconBtn"  class="icon-btn" title="ツンデレのアイコンを変更">🤖</button>
+      <input id="userIconInput" type="file" accept="image/*" hidden />
+      <input id="botIconInput"  type="file" accept="image/*" hidden />
+    </div>
+  </header>
+
+  <main id="chatScroll" class="chat-scroll">
+    <ul id="chatList" class="chat-list" aria-live="polite"></ul>
+  </main>
+
+  <footer class="composer">
+    <form id="chatForm" autocomplete="off">
+      <textarea id="inputText" placeholder="メッセージを入力…" rows="1"></textarea>
+      <button id="sendBtn" type="submit">送信</button>
+    </form>
+  </footer>
+
+  <script type="module">
+    // フォーム送信を抑止（リロード防止）
+    document.getElementById("chatForm")
+      .addEventListener("submit", (e) => e.preventDefault());
+  </script>
+  <script type="module" src="./frontend/main.js"></script>
+</body>
+</html>

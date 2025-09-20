@@ -1,0 +1,195 @@
+const historyList = document.getElementById("historyList");
+const reloadBtn = document.getElementById("reloadHistory");
+const sortBtn = document.getElementById("toggleSort");
+
+let sortDesc = true; // 新着→古い（降順）
+
+async function fetchHistory() {
+  const res = await fetch("/api/history");
+  if (!res.ok) throw new Error(\`history fetch failed: \${res.status}\`);
+  const data = await res.json();
+  const items = data.messages ?? data;
+  return Array.isArray(items) ? items : [];
+}
+
+function fmt(ts) {
+  if (!ts) return "-";
+  // "YYYY-MM-DD HH:mm:ss" 想定
+  return ts.replace(" ", " / ");
+}
+
+function el(tag, props = {}, ...children) {
+  const node = document.createElement(tag);
+  Object.assign(node, props);
+  for (const c of children) {
+    if (typeof c === "string") node.appendChild(document.createTextNode(c));
+    else if (c) node.appendChild(c);
+  }
+  return node;
+}
+
+function makeEditor(msg, onFinish) {
+  const wrap = el("div", { className: "editor" });
+
+  const ta = el("textarea", {
+    value: msg.content,
+    rows: 3,
+    className: "w-full",
+  });
+
+  const mood = el("select", { className: "select" },
+    el("option", { value: "" }, "（変更なし）"),
+    el("option", { value: "tsun", selected: msg.mood === "tsun" }, "tsun"),
+    el("option", { value: "dere", selected: msg.mood === "dere" }, "dere"),
+    el("option", { value: "neutral", selected: msg.mood === "neutral" }, "neutral"),
+  );
+
+  const saveBtn = el("button", { className: "btn primary" }, "保存");
+  const cancelBtn = el("button", { className: "btn", style: "margin-left:8px" }, "キャンセル");
+
+  saveBtn.addEventListener("click", async () => {
+    const payload = {};
+    const newText = ta.value.trim();
+    const newMood = mood.value.trim();
+
+    if (newText && newText !== msg.content) payload.content = newText;
+    if (newMood && newMood !== msg.mood) payload.mood = newMood;
+
+    if (!Object.keys(payload).length) {
+      toast("変更なし");
+      onFinish(false);
+      return;
+    }
+
+    try {
+      saveBtn.disabled = cancelBtn.disabled = true;
+      const res = await fetch(`/api/mod/${msg.id}`, {
+        method: "PUT",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) {
+        const error = await res.json().catch(()=>({}));
+        throw new Error(`更新に失敗: ${res.status} ${error.error ?? ""}`);
+      }
+      toast("更新しました");
+      onFinish(true);
+    } catch (e) {
+      console.error(e);
+      alert(e.message);
+      onFinish(false);
+    } finally {
+      saveBtn.disabled = cancelBtn.disabled = false;
+    }
+  });
+
+  cancelBtn.addEventListener("click", () => onFinish(false));
+
+  wrap.append(
+    el("div", { className: "editor-row" }, ta),
+    el("div", { className: "editor-row" },
+      el("label", { className: "label" }, "mood: "),
+      mood
+    ),
+    el("div", { className: "editor-actions" }, saveBtn, cancelBtn),
+  );
+  return wrap;
+}
+
+function liMessage(msg) {
+  const li = el("li", { className: "item", dataset: { id: msg.id } });
+
+  const meta = el("div", { className: "meta" },
+    `#${msg.id} • ${msg.role} • ${msg.mood ?? "-"} • ${fmt(msg.created_at)}${msg.edited_at ? ` (edited: ${fmt(msg.edited_at)})` : ""}`
+  );
+
+  const body = el("div", { className: "body" }, msg.content);
+
+  const editBtn = el("button", { className: "btn" }, "編集");
+  const delBtn = el("button", { className: "btn danger", style: "margin-left:8px" }, "削除");
+
+  const btns = el("div", { className: "actions" }, editBtn, delBtn);
+
+  editBtn.addEventListener("click", () => {
+    if (li.querySelector(".editor")) return; // 二重防止
+    const editor = makeEditor(msg, async (changed) => {
+      editor.remove();
+      if (changed) await loadHistory();
+    });
+    li.appendChild(editor);
+    editor.querySelector("textarea")?.focus();
+  });
+
+  delBtn.addEventListener("click", async () => {
+    if (!confirm("このメッセージを削除しますか？")) return;
+    try {
+      editBtn.disabled = delBtn.disabled = true;
+      const res = await fetch(`/api/mod/${msg.id}`, { method: "DELETE" });
+      if (!res.ok) {
+        const error = await res.json().catch(()=>({}));
+        throw new Error(`削除に失敗: ${res.status} ${error.error ?? ""}`);
+      }
+      toast("削除しました");
+      await loadHistory();
+    } catch (e) {
+      console.error(e);
+      alert(e.message);
+    } finally {
+      editBtn.disabled = delBtn.disabled = false;
+    }
+  });
+
+  li.append(meta, body, btns);
+  return li;
+}
+
+function renderHistory(items) {
+  historyList.innerHTML = "";
+  if (!items.length) {
+    historyList.appendChild(el("li", {}, "履歴がありません"));
+    return;
+  }
+  // 並び替え
+  const sorted = [...items].sort((a,b) => {
+    const ka = (a.created_at ?? "") + String(a.id).padStart(10, "0");
+    const kb = (b.created_at ?? "") + String(b.id).padStart(10, "0");
+    return sortDesc ? (kb.localeCompare(ka)) : (ka.localeCompare(kb));
+  });
+  for (const msg of sorted) historyList.appendChild(liMessage(msg));
+}
+
+async function loadHistory() {
+  try {
+    const items = await fetchHistory();
+    renderHistory(items);
+  } catch (e) {
+    console.error(e);
+    alert("履歴取得に失敗しました。サーバーを確認してください。");
+  }
+}
+
+function toast(message) {
+  const t = el("div", { className: "toast" }, message);
+  document.body.appendChild(t);
+  setTimeout(() => t.remove(), 1400);
+}
+
+reloadBtn?.addEventListener("click", loadHistory);
+sortBtn?.addEventListener("click", () => {
+  sortDesc = !sortDesc;
+  sortBtn.textContent = sortDesc ? "並び: 新→古" : "並び: 古→新";
+  // 再描画
+  const lis = [...historyList.querySelectorAll("li")];
+  if (!lis.length) return;
+  // 既存配列から再構築用にIDを読む
+  const items = lis.map(li => ({
+    id: Number(li.querySelector(".meta")?.textContent.match(/#(\d+)/)?.[1]),
+    role: li.querySelector(".meta")?.textContent.includes(" assistant ") ? "assistant" : "user",
+    mood: (li.querySelector(".meta")?.textContent.match(/• (tsun|dere|neutral|-) •/)||[])[1],
+    created_at: (li.querySelector(".meta")?.textContent.match(/• ([0-9-/: ]+)/)||[])[1]?.split(" (")[0],
+    content: li.querySelector(".body")?.textContent ?? "",
+  }));
+  renderHistory(items);
+});
+
+loadHistory();
