@@ -36,4 +36,4 @@ node backend/server.js
 - フロントエンドとバックエンドの連携
 - GitHubでの公開・ポートフォリオ化
 
-🌐 [English README](README.en.md)
+🌐 [English README](README.en.md)　
